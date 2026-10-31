@@ -1,14 +1,16 @@
-// The combobox receives the shared dataset; matches are references to its players.
-export function initPlayerSearch(players) {
-  const form = document.querySelector('.profile-picker-form');
-  const field = form.querySelector('.player-autocomplete');
-  const input = form.querySelector('#profile-search');
-  const selectedId = form.querySelector('#selected-player-id');
-  const submitButton = form.querySelector('[type="submit"]');
-  const popup = form.querySelector('.player-search-popup');
-  const list = form.querySelector('#player-suggestions');
-  const emptyMessage = form.querySelector('.player-search-empty');
-  const status = document.querySelector('#profile-search-status');
+// Independent combobox instances share player references and the same behavior.
+// setPlayer() updates a controlled field silently (prefill, swap, reset).
+export function createPlayerAutocomplete(field, players, {
+  status,
+  onChange = () => {},
+  validateSelection = () => '',
+  onInvalid = () => {},
+} = {}) {
+  const input = field.querySelector('[role="combobox"]');
+  const selectedId = field.querySelector('[type="hidden"]');
+  const popup = field.querySelector('.player-search-popup');
+  const list = field.querySelector('[role="listbox"]');
+  const emptyMessage = field.querySelector('.player-search-empty');
   const template = document.querySelector('#player-suggestion-template');
   let matches = [];
   let selectedPlayer = null;
@@ -16,8 +18,8 @@ export function initPlayerSearch(players) {
 
   function clearSelection() {
     selectedPlayer = null;
-    selectedId.value = '';
-    submitButton.disabled = true;
+    if (selectedId) selectedId.value = '';
+    input.removeAttribute('aria-invalid');
   }
 
   function closeSuggestions() {
@@ -42,7 +44,7 @@ export function initPlayerSearch(players) {
     matches.forEach((entry, index) => {
       const suggestion = template.content.cloneNode(true);
       const option = suggestion.querySelector('[role="option"]');
-      option.id = `player-suggestion-${entry.id}`;
+      option.id = `${list.id}-${entry.id}`;
       option.dataset.index = index;
       suggestion.querySelector('[data-suggestion-avatar]').textContent = entry.nickname.slice(0, 2).toUpperCase();
       suggestion.querySelector('[data-suggestion-name]').textContent = entry.nickname;
@@ -67,18 +69,34 @@ export function initPlayerSearch(players) {
   }
 
   function selectPlayer(entry) {
-    selectedPlayer = entry;
-    input.value = entry.nickname;
-    selectedId.value = entry.id;
-    submitButton.disabled = false;
-    closeSuggestions();
-    status.textContent = `Выбран ${entry.nickname}, ${entry.team}. Можно открыть профиль.`;
+    const error = validateSelection(entry);
+    if (error) {
+      clearSelection();
+      onChange(null);
+      closeSuggestions();
+      input.setAttribute('aria-invalid', 'true');
+      status.textContent = error;
+      onInvalid(error);
+      return;
+    }
+    setPlayer(entry);
+    onChange(entry);
     input.focus({ preventScroll: true });
+  }
+
+  function setPlayer(entry) {
+    selectedPlayer = entry;
+    input.value = entry?.nickname || '';
+    if (selectedId) selectedId.value = entry?.id || '';
+    input.removeAttribute('aria-invalid');
+    closeSuggestions();
+    status.textContent = entry ? `Выбран ${entry.nickname}, ${entry.team}.` : '';
   }
 
   input.addEventListener('input', () => {
     // Even editing a selected nickname back to the same text requires a new choice.
     clearSelection();
+    onChange(null);
     renderSuggestions();
   });
   input.addEventListener('focus', () => {
@@ -112,17 +130,33 @@ export function initPlayerSearch(players) {
   document.addEventListener('pointerdown', (event) => {
     if (!field.contains(event.target)) closeSuggestions();
   });
-  form.addEventListener('focusout', (event) => {
+  field.addEventListener('focusout', (event) => {
     if (event.relatedTarget && !field.contains(event.relatedTarget)) closeSuggestions();
   });
 
+  return {
+    setPlayer,
+    getPlayer: () => selectedPlayer && input.value === selectedPlayer.nickname
+      && (!selectedId || selectedId.value === selectedPlayer.id) ? selectedPlayer : null,
+  };
+}
+
+// Profile form adapter: keep its native GET navigation and submission guard.
+export function initPlayerSearch(players) {
+  const form = document.querySelector('.profile-picker-form');
+  const input = form.querySelector('[role="combobox"]');
+  const submitButton = form.querySelector('[type="submit"]');
+  const search = createPlayerAutocomplete(form.querySelector('.player-autocomplete'), players, {
+    status: document.querySelector('#profile-search-status'),
+    onChange: (entry) => { submitButton.disabled = !entry; },
+  });
   form.addEventListener('submit', (event) => {
     // Guard Enter/programmatic submits as well as the disabled button.
-    if (!selectedPlayer || input.value !== selectedPlayer.nickname || selectedId.value !== selectedPlayer.id) {
+    if (!search.getPlayer()) {
       event.preventDefault();
-      clearSelection();
+      search.setPlayer(null);
+      submitButton.disabled = true;
       input.focus();
-      renderSuggestions();
     }
   });
 }
