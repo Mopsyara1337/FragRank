@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Будущий раздел с общей картиной результатов: игровые показатели, распределения и полезные наблюдения.">
+  <meta name="description" content="Общая статистика FragRank: средние показатели игроков, топ-10, страны, команды и распределение K/D. Все игровые показатели демонстрационные.">
   <meta name="theme-color" content="#FFFFFF">
   <title>Статистика — FragRank</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/styles.css">
   <script src="js/main.js" defer></script>
+  <script src="js/stats.js" type="module"></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Перейти к содержимому</a>
@@ -40,18 +41,56 @@
     <div class="page-heading">
       <p class="eyebrow">Взгляд на игру через данные</p>
       <h1>Статистика</h1>
-      <p>Будущий раздел с общей картиной результатов: игровые показатели, распределения и полезные наблюдения.</p>
+      <p>Общий взгляд на участников FragRank: ключевые показатели, лидеры и распределение игроков в одном месте.</p>
     </div>
-    <!-- Prepared container: implement this section in a later project stage. -->
-    <section class="workspace" id="stats-workspace" aria-labelledby="workspace-title">
-      <div class="workspace-header"><h2 id="workspace-title">Обзор показателей</h2><span class="status-label">Раздел готовится</span></div>
-      <div class="empty-state">
-        <span class="empty-symbol" aria-hidden="true">▥</span>
-        <h3>Цифры получат контекст</h3>
-        <p>Контейнер статистики подготовлен. Подробные сводки и визуализация показателей появятся на следующих этапах.</p>
+    <p class="profile-fallback" id="stats-fallback">Для статистики нужны JavaScript и запуск через Live Server. <a class="text-link" href="ranking.html">Перейти в рейтинг <span aria-hidden="true">→</span></a></p>
+    <div id="stats-content" hidden>
+      <section class="workspace" id="stats-workspace" aria-labelledby="workspace-title">
+        <div class="workspace-header"><h2 id="workspace-title">Обзор набора</h2><span class="demo-badge">Демонстрационная статистика</span></div>
+        <div class="stats-intro"><p>Все игровые показатели вымышлены. Сводка и диаграммы рассчитаны по общему набору игроков FragRank. Команды указаны по составам декабря 2024 года.</p></div>
+        <dl class="stats-summary">
+          <div class="stats-summary-card"><dt>Игроков</dt><dd data-stats-summary="players"></dd><dd class="stats-summary-note">в общем наборе</dd></div>
+          <div class="stats-summary-card"><dt>Команд</dt><dd data-stats-summary="teams"></dd><dd class="stats-summary-note">уникальных названий</dd></div>
+          <div class="stats-summary-card"><dt>Стран</dt><dd data-stats-summary="countries"></dd><dd class="stats-summary-note">представлено игроками</dd></div>
+          <div class="stats-summary-card"><dt>Средний K/D</dt><dd data-stats-summary="averageKD"></dd><dd class="stats-summary-note">убийства / смерти</dd></div>
+          <div class="stats-summary-card"><dt>Средний ADR</dt><dd data-stats-summary="averageADR"></dd><dd class="stats-summary-note">урона за раунд</dd></div>
+          <div class="stats-summary-card"><dt>Средний Win Rate</dt><dd data-stats-summary="averageWinRate"></dd><dd class="stats-summary-note">доля выигранных карт</dd></div>
+        </dl>
+        <p class="stats-method-note">Средние — арифметические по игрокам: сумма индивидуальных K/D, ADR или Win Rate, делённая на число участников. Каждый игрок имеет одинаковый вес независимо от количества сыгранных карт.</p>
+      </section>
+
+      <section class="workspace" aria-labelledby="stats-top-title">
+        <div class="workspace-header"><h2 id="stats-top-title">Топ-10 по FragScore</h2><div class="filter-field stats-chart-control"><label for="stats-metric">Показатель</label><select id="stats-metric"><option value="fragScore">FragScore</option><option value="kd">K/D</option><option value="adr">ADR</option><option value="hs">HS%</option><option value="winRate">Win Rate</option></select></div></div>
+        <div class="stats-chart-description"><p id="stats-top-status" role="status" aria-live="polite" aria-atomic="true"></p><p>Оранжевым отмечен максимум; точные значения доступны в подсказках чисел.</p></div>
+        <div class="stats-top-chart">
+          <div class="stats-top-axis" aria-hidden="true"><span>Игрок / команда</span><div class="stats-axis"><span>0</span><span id="stats-axis-middle"></span><span id="stats-axis-max"></span></div><span id="stats-axis-unit"></span></div>
+          <ol class="stats-top-list" id="stats-top-list" aria-label="Десять лучших игроков по выбранному показателю"></ol>
+        </div>
+      </section>
+
+      <div class="stats-detail-grid">
+        <section class="workspace" aria-labelledby="stats-countries-title">
+          <div class="workspace-header"><h2 id="stats-countries-title">География игроков</h2><span class="status-label">Распределение по странам</span></div>
+          <div class="stats-chart-description"><p>Количество игроков из каждой страны и их доля от общего набора.</p><p id="stats-country-scale"></p></div>
+          <ul class="stats-distribution-list" id="stats-country-list" aria-label="Игроки по странам"></ul>
+          <div class="stats-disclosure-footer" hidden><button class="reset-button stats-disclosure-button" id="stats-country-toggle" type="button" aria-expanded="false" aria-controls="stats-country-list">Показать все страны</button></div>
+        </section>
+        <div class="stats-secondary-column">
+          <section class="workspace" aria-labelledby="stats-teams-title">
+            <div class="workspace-header"><h2 id="stats-teams-title">Представленность команд</h2><div class="filter-field stats-chart-control"><label for="stats-team-sort">Численность</label><select id="stats-team-sort"><option value="desc">По убыванию</option><option value="asc">По возрастанию</option></select></div></div>
+            <div class="stats-chart-description"><p id="stats-team-note"></p><p id="stats-team-scale"></p><p class="visually-hidden" id="stats-team-status" role="status" aria-live="polite" aria-atomic="true"></p></div>
+            <ul class="stats-distribution-list stats-team-list" id="stats-team-list" aria-label="Игроки по командам"></ul>
+            <div class="stats-disclosure-footer" hidden><button class="reset-button stats-disclosure-button" id="stats-team-toggle" type="button" aria-expanded="false" aria-controls="stats-team-list">Показать все команды</button></div>
+          </section>
+          <section class="workspace" aria-labelledby="stats-kd-title">
+            <div class="workspace-header"><h2 id="stats-kd-title">Распределение K/D</h2><span class="status-label">Пять диапазонов</span></div>
+            <div class="stats-chart-description"><p>Интервалы не пересекаются; распределение рассчитано по исходным K/D до округления.</p><p id="stats-kd-scale"></p></div>
+            <ul class="stats-distribution-list" id="stats-kd-list" aria-label="Игроки по диапазонам K/D"></ul>
+          </section>
+        </div>
       </div>
-    </section>
-    <div class="next-step"><p>Этап 1 · Структура проекта и главная страница</p><a class="text-link" href="index.html">На главную <span aria-hidden="true">→</span></a></div>
+    </div>
+    <div class="next-step"><p>Этап 5 · Общая статистика</p><a class="text-link" href="ranking.html">В рейтинг <span aria-hidden="true">→</span></a></div>
   </main>
 
   <footer class="site-footer">
@@ -63,5 +102,11 @@
       <div class="footer-bottom"><p>© 2026 FragRank. Учебный проект по веб-разработке.</p><p>Демонстрационные данные · Не связан с Valve.</p></div>
     </div>
   </footer>
+  <template id="stats-top-row-template">
+    <li><a class="stats-top-row"><span class="stats-top-position" data-top-position></span><span class="stats-top-player"><span class="avatar" data-top-avatar aria-hidden="true"></span><span class="stats-top-identity"><span data-top-nickname></span><span data-top-team></span></span></span><span class="stats-chart-track" aria-hidden="true"><span class="stats-chart-fill"></span></span><span class="stats-top-value"><strong data-top-value></strong><span data-top-unit></span></span></a></li>
+  </template>
+  <template id="stats-distribution-template">
+    <li class="stats-distribution-row"><div class="stats-distribution-heading"><span class="stats-group-label"><span data-group-name></span><span data-group-detail hidden></span></span><span class="stats-group-values"><strong data-group-count></strong><span data-group-percent></span></span></div><div class="stats-chart-track" aria-hidden="true"><span class="stats-chart-fill"></span></div></li>
+  </template>
 </body>
 </html>
